@@ -16,45 +16,84 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import argparse
 import email
 import glob
 import os
 
+from bodatools import __version__ as bodatools_version
 from bodatools.binfile import outlookexpress
+
+# NOTE: optparse is deprecated in 2.7 but argparse isn't available
+# until 2.7. Support both for now (but consider removing the optparse
+# logic when we reasonably can).
+
+try:
+    import argparse
+except ImportError:
+    argparse = None
+    import optparse
 
 
 def main():
-    parser = argparse.ArgumentParser(description='''
-Export email messages from binary folder format into individual
+
+    # common usage information used by argparse and optparse parsers
+    description = '''Export email messages from binary folder format into individual
 files for each email or attachment.
 Currently only supports Outlook Express 4.5 for Macintosh.
 
 For more details on usage and output formats, see
 http://bodatools.readthedocs.org/en/latest/scripts.html
-    ''',   
-       formatter_class=argparse.RawDescriptionHelpFormatter)
-    # TODO: make positional args instead of -d ? 
-    parser.add_argument('--directory', '-d', dest='dir', metavar='DIR',
-                        help='Directory that contains the email folders',
-                        required=True)
-    parser.add_argument('--output', '-o', dest='output', metavar='DIR',
-                        help='Output directory for exported content',
-                        required=True)
-    args = parser.parse_args()
+'''
+    input_help = 'Directory that contains email folders to be exported'
+    output_help = 'Output directory for exported content'
+
+    # use argparse if we can
+    if argparse:
+        parser = argparse.ArgumentParser(description=description,   
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser.add_argument(dest='dir', metavar='INPUT_DIR', nargs=1,
+                            help=input_help)
+        parser.add_argument(dest='output', metavar='OUTPUT_DIR', nargs=1,
+                            help=output_help)
+        parser.add_argument('--version', action='version',
+                            version='%%(prog)s bodatools %s' % \
+                            bodatools_version)
+        args = parser.parse_args()
+        
+        input_dir = args.dir[0]
+        output_dir = args.output[0]
+
+    # fallback to optparse if necessary
+    else:
+        # optparse doesn't output usage details for positional args,
+        # so patch it in
+        epilog = '''INPUT_DIR: %s; OUTPUT_DIR: %s''' % (input_help, output_help)
+        
+        parser = optparse.OptionParser(usage='usage: %prog INPUT_DIR OUTPUT_DIR',
+                                       description=description,
+                                       epilog=epilog,
+                                       version='%%prog bodatools %s' % \
+                                       			bodatools_version)
+        options, args = parser.parse_args()
+        if len(args) < 2:
+            parser.error('A required argument is missing')
+        if len(args) > 2:
+            parser.error('Too many arguments')
+        input_dir, output_dir = args
+        
 
     # make sure directories exist before proceeding
-    if not os.path.isdir(args.dir):
-        print 'Error: %s is not a directory' % args.dir
+    if not os.path.isdir(input_dir):
+        print 'Error: %s is not a directory' % input_dir
         exit(-1)
-    if not os.path.isdir(args.output):
+    if not os.path.isdir(output_dir):
         # error? or create if it doesn't exist?
-        print 'Error: %s is not a directory' % args.output
+        print 'Error: %s is not a directory' % output_dir
         exit(-1)
 
     # look for all directories immediately under the specified path
     # with an 'Index' file
-    folder_indexes = glob.glob(os.path.join(args.dir, '*', 'Index'))
+    folder_indexes = glob.glob(os.path.join(input_dir, '*', 'Index'))
     folder_paths = [os.path.dirname(f) for f in folder_indexes]
 
     for f_path in folder_paths:
@@ -66,7 +105,7 @@ http://bodatools.readthedocs.org/en/latest/scripts.html
 
         print 'Mail folder "%s" contains %d message(s)' % (folder_name, folder.count)
         if folder.count:
-            process_folder(folder, folder_name, args.output)
+            process_folder(folder, folder_name, output_dir)
 
     exit(0)
 

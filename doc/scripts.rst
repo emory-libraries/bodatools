@@ -13,14 +13,14 @@ scrutinized and archived.
 
 Currently, the only supported email format is Outlook Express 4.5 for
 Macintosh, but we expect to add support for other formats as we
-encounter them.
+encounter them.pp
 
 Example usage::
 
-  $ export-emails -d "Internet Mail" -o email-output
+  $ export-emails "Internet Mail" email-output
 
-Where ``Internet Mail`` is the directory that contains Outlook Express
-folders such as Inbox, Outbox, and Sent Mail, and ``email-output`` is
+where **Internet Mail** is the directory that contains Outlook Express
+folders such as Inbox, Outbox, and Sent Mail, and **email-output** is
 a folder where the exported messages should be saved. On our hardware,
 the Outlook Express directory structure looks like this::
 
@@ -63,18 +63,19 @@ attachments with a filename, ``export-email`` will create a file in a
 ``_parts`` directory matching the output file name for the email
 message.
 
-In some cases, the folder index references deleted messages; these are
-currently skipped for output, but a count of skipped deleted messages
-will be reported when the script is run.  In other cases, there are
-content sections in the folder data file which are not referenced by
-the folder index (i.e., when the index and data files are apparently
-not synchronized); these cannot exported, but a summary of the number
-of skipped sections is included in the script output in case further
-investigation is needed.
 
 .. Note::
 
-   Requires Python2.7 (due to use of :mod:`argparse`).
+  In some cases, the folder ``Index`` file may reference deleted
+  messages; these are currently skipped for output, but if any are
+  found, a count of skipped deleted messages will be reported when the
+  script runs.  In some cases, there may also be content sections in
+  the ``Mail`` data file which are not referenced by the folder
+  ``Index`` (i.e., when the index and data files were not completely
+  synchronized); these cannot exported, but a summary of the number of
+  skipped sections is included in the script output in case further
+  investigation is needed.
+
 
 
 
