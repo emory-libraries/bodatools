@@ -36,4 +36,7 @@ setup(
     description='A collection of python utilities and scripts for working with binary files',
     long_description=LONG_DESCRIPTION,
     classifiers=CLASSIFIERS,
+    scripts=[
+        'scripts/export-email',
+    ],
 )
