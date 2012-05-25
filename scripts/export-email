@@ -26,10 +26,14 @@ from bodatools.binfile import outlookexpress
 
 def main():
     parser = argparse.ArgumentParser(description='''
-    Export email messages from binary folder format into individual
-    files for each email or attachment.  Currently only supports
-    Outlook Express 4.5 for Macintosh.
-    ''')
+Export email messages from binary folder format into individual
+files for each email or attachment.
+Currently only supports Outlook Express 4.5 for Macintosh.
+
+For more details on usage and output formats, see
+http://bodatools.readthedocs.org/en/latest/scripts.html
+    ''',   
+       formatter_class=argparse.RawDescriptionHelpFormatter)
     # TODO: make positional args instead of -d ? 
     parser.add_argument('--directory', '-d', dest='dir', metavar='DIR',
                         help='Directory that contains the email folders',
