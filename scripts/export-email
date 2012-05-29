@@ -151,6 +151,14 @@ def process_folder(folder, folder_name, output_dir):
                 # so include anything that email can generate a filename for
                 if 'attachment' in p.get('Content-Disposition', '') \
                        or p.get_filename():
+
+                    # In earlier versions of Python (at least 2.6.1),
+                    # an attachment filename cannot be determined in
+                    # some cases where 2.7.x Python returns finds one.
+                    # Warn and skip
+                    if not p.get_filename():
+                        print 'Error, could not determine filename for attachment'
+                        continue
                     
                     # make a parts dir if we don't have one yet
                     if not os.path.isdir(parts_dir):
