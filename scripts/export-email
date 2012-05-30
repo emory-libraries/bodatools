@@ -16,6 +16,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import argparse
 import email
 import glob
 import os
@@ -23,64 +24,29 @@ import os
 from bodatools import __version__ as bodatools_version
 from bodatools.binfile import outlookexpress
 
-# NOTE: optparse is deprecated in 2.7 but argparse isn't available
-# until 2.7. Support both for now (but consider removing the optparse
-# logic when we reasonably can).
-
-try:
-    import argparse
-except ImportError:
-    argparse = None
-    import optparse
-
 
 def main():
-
-    # common usage information used by argparse and optparse parsers
-    description = '''Export email messages from binary folder format into individual
+    desc = '''Export email messages from binary folder format into individual
 files for each email or attachment.
 Currently only supports Outlook Express 4.5 for Macintosh.
 
 For more details on usage and output formats, see
 http://bodatools.readthedocs.org/en/latest/scripts.html
 '''
-    input_help = 'Directory that contains email folders to be exported'
-    output_help = 'Output directory for exported content'
-
-    # use argparse if we can
-    if argparse:
-        parser = argparse.ArgumentParser(description=description,   
-            formatter_class=argparse.RawDescriptionHelpFormatter)
-        parser.add_argument(dest='dir', metavar='INPUT_DIR', nargs=1,
-                            help=input_help)
-        parser.add_argument(dest='output', metavar='OUTPUT_DIR', nargs=1,
-                            help=output_help)
-        parser.add_argument('--version', action='version',
-                            version='%%(prog)s bodatools %s' % \
-                            bodatools_version)
-        args = parser.parse_args()
-        
-        input_dir = args.dir[0]
-        output_dir = args.output[0]
-
-    # fallback to optparse if necessary
-    else:
-        # optparse doesn't output usage details for positional args,
-        # so patch it in
-        epilog = '''INPUT_DIR: %s; OUTPUT_DIR: %s''' % (input_help, output_help)
-        
-        parser = optparse.OptionParser(usage='usage: %prog INPUT_DIR OUTPUT_DIR',
-                                       description=description,
-                                       epilog=epilog,
-                                       version='%%prog bodatools %s' % \
-                                       			bodatools_version)
-        options, args = parser.parse_args()
-        if len(args) < 2:
-            parser.error('A required argument is missing')
-        if len(args) > 2:
-            parser.error('Too many arguments')
-        input_dir, output_dir = args
-        
+    
+    parser = argparse.ArgumentParser(description=desc,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(dest='dir', metavar='INPUT_DIR', nargs=1,
+                        help='Directory that contains email folders to be exported')
+    parser.add_argument(dest='output', metavar='OUTPUT_DIR', nargs=1,
+                        help='Output directory for exported content')
+    parser.add_argument('--version', action='version',
+                        version='%%(prog)s bodatools %s' % \
+                        bodatools_version)
+    args = parser.parse_args()
+    
+    input_dir = args.dir[0]
+    output_dir = args.output[0]
 
     # make sure directories exist before proceeding
     if not os.path.isdir(input_dir):

@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages
-import bodatools
+import sys
+
+from bodatools import __version__
 
 LONG_DESCRIPTION = None
 try:
@@ -24,15 +26,19 @@ CLASSIFIERS = [
     'Topic :: Utilities',
 ]
 
+install_requires=[]
+if sys.version_info < (2, 7):
+    install_requires.append("argparse==1.1")
+
 setup(
     name='bodatools',
-    version=bodatools.__version__,
+    version=__version__,
     author='Emory University Libraries',
     author_email='libsysdev-l@listserv.cc.emory.edu',
     url='https://github.com/emory-libraries/bodatools',
     license='Apache License, Version 2.0',
     packages=find_packages(),
-    install_requires=[],
+    install_requires=install_requires,
     description='A collection of python utilities and scripts for working with binary files',
     long_description=LONG_DESCRIPTION,
     classifiers=CLASSIFIERS,
