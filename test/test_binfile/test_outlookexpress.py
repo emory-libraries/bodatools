@@ -33,20 +33,28 @@ logger = logging.getLogger(__name__)
 class TestMacIndex(unittest.TestCase):
     index_filename = os.path.join(FIXTURE_FOLDER, 'Index')
     data_filename = os.path.join(FIXTURE_FOLDER, 'Mail')
+
+    def setUp(self):
+        self.index_fobj = open(self.index_filename)
+        self.data_fobj = open(self.data_filename)
+
+    def tearDown(self):
+        self.index_fobj.close()
+        self.data_fobj.close()
     
     def test_basic_properties(self):
         logger.warn('test')
 
-        idx = outlookexpress.MacIndex(self.index_filename)
+        idx = outlookexpress.MacIndex(self.index_fobj)
 
         self.assertEqual(2, idx.total_messages)
         self.assertTrue(idx.sanity_check())
 
-        not_idx = outlookexpress.MacIndex(self.data_filename)
+        not_idx = outlookexpress.MacIndex(self.data_fobj)
         self.assertFalse(not_idx.sanity_check())
 
     def test_messages(self):
-        idx = outlookexpress.MacIndex(self.index_filename)
+        idx = outlookexpress.MacIndex(self.index_fobj)
         messages = list(idx.messages)
         self.assertEqual(len(messages), 2)
 
@@ -60,12 +68,20 @@ class TestMacIndex(unittest.TestCase):
     index_filename = os.path.join(FIXTURE_FOLDER, 'Index')
     data_filename = os.path.join(FIXTURE_FOLDER, 'Mail')
     
+    def setUp(self):
+        self.index_fobj = open(self.index_filename)
+        self.data_fobj = open(self.data_filename)
+
+    def tearDown(self):
+        self.index_fobj.close()
+        self.data_fobj.close()
+    
     def test_basic_properties(self):
-        data = outlookexpress.MacMail(self.data_filename)
+        data = outlookexpress.MacMail(self.data_fobj)
 
         self.assertTrue(data.sanity_check())
 
-        not_data = outlookexpress.MacMail(self.index_filename)
+        not_data = outlookexpress.MacMail(self.index_fobj)
         self.assertFalse(not_data.sanity_check())
 
     # NOTE: can't test get_message independently, since

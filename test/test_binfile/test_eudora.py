@@ -27,14 +27,18 @@ def fixture(fname):
     return os.path.join(TEST_ROOT, 'fixtures', fname)
 
 class TestEudora(unittest.TestCase):
-    def test_members(self):
-        fname = fixture('In.toc')
-        obj = eudora.Toc(fname)
+    def setUp(self):
+        self.fobj = open(fixture('In.toc'))
+        self.obj = eudora.Toc(self.fobj)
 
-        self.assertEqual(obj.version, 1)
-        self.assertEqual(obj.name, 'In')
+    def tearDown(self):
+        self.fobj.close()
+
+    def test_members(self):
+        self.assertEqual(self.obj.version, 1)
+        self.assertEqual(self.obj.name, 'In')
         
-        messages = list(obj.messages)
+        messages = list(self.obj.messages)
         self.assertEqual(len(messages), 2)
 
         # note: we don't actually test all of the fields here. it's not

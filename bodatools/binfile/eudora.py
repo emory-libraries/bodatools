@@ -91,8 +91,9 @@ class Toc(binfile.BinaryStructure):
         # end of the file.
 
         offset = self.LENGTH
-        while offset < len(self.mmap):
-            yield Message(mm=self.mmap, offset=offset)
+        while offset < len(self):
+            m = Message(fobj=self.fobj, offset=offset, length=Message.LENGTH)
+            yield m
             offset += Message.LENGTH
 
 

@@ -18,7 +18,6 @@
 
 import unittest
 import os
-import mmap
 
 from bodatools import binfile
 from testcore import main
@@ -28,25 +27,12 @@ def fixture(fname):
     return os.path.join(TEST_ROOT, 'fixtures', fname)
 
 class BinaryStructureTest(unittest.TestCase):
-    def test_init_with_fname(self):
-        fname = fixture('numbers.bin')
-        obj = binfile.BinaryStructure(fname)
-        self.assertEqual(obj.mmap[0], '\x00')
-        self.assertEqual(obj.mmap[1], '\x01')
-
     def test_init_with_fd(self):
         fobj = open(fixture('numbers.bin'))
         obj = binfile.BinaryStructure(fobj)
-        self.assertEqual(obj.mmap[0], '\x00')
-        self.assertEqual(obj.mmap[1], '\x01')
+        self.assertEqual(obj[0], '\x00')
+        self.assertEqual(obj[1], '\x01')
 
-    def test_init_with_mm(self):
-        fobj = open(fixture('numbers.bin'))
-        mm = mmap.mmap(fobj.fileno(), 0, prot=1)
-        obj = binfile.BinaryStructure(mm=mm)
-        self.assertEqual(obj.mmap[0], '\x00')
-        self.assertEqual(obj.mmap[1], '\x01')
-        
     # we test offset below: it's only used implicitly by fields
         
 
@@ -58,9 +44,12 @@ class TestObject(binfile.BinaryStructure):
 
 class FieldTest(unittest.TestCase):
     def setUp(self):
-        fname = fixture('numbers.bin')
-        self.obj = TestObject(fname)
-        self.offset_obj = TestObject(fname, offset=1)
+        self.fobj = open(fixture('numbers.bin'))
+        self.obj = TestObject(self.fobj)
+        self.offset_obj = TestObject(self.fobj, offset=1)
+
+    def tearDown(self):
+        self.fobj.close()
 
     def test_byte(self):
         self.assertEqual(self.obj.byte, '\x00\x01')

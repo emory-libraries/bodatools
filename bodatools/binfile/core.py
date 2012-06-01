@@ -61,13 +61,15 @@ This package exports the following names:
    variable-length binary strings to Python strings
  * :class:`~bodatools.binfile.IntegerField` -- a field that maps fixed-length
    binary data to Python numbers
+ * :func:`~bodatools.binfile.hexdump` -- a convenience function for printing
+   raw hexadecimal contents of a :class:`~bodatools.binfile.BinaryStructure`
 '''
 # see bodatools/binfile/__init__.py for more docs
 
-from mmap import mmap
+import os
 
 __all__ = [ 'BinaryStructure', 'ByteField', 'LengthPrependedStringField',
-            'IntegerField' ]
+            'IntegerField', 'hexdump' ]
 
 class BinaryStructure(object):
     """A superclass for binary data structures superimposed over files.
@@ -78,26 +80,112 @@ class BinaryStructure(object):
     code accesses fields on the instance, they are calculated from the
     underlying binary file data.
 
-    Instead of a file, it is occasionally appropriate to overlay an
-    :class:`~mmap.mmap` structure (from the :mod:`mmap` standard library).
-    This happens most often when one ``BinaryStructure`` instance creates
-    another, passing ``self.mmap`` to the secondary object's constructor. In
-    this case, the caller may specify the `mm` argument instead of an
-    `fobj`.
-
     :param fobj: a file object or filename to overlay
-    :param mm: a :class:`~mmap.mmap` object to overlay
     :param offset: the offset into the file where the structured data begins
+    :param length: the length of the structured data, or ``None`` for the
+                   entire file
     """
 
-    def __init__(self, fobj=None, mm=None, offset=0):
-        if mm is not None:
-            self.mmap = mm
-        else:
-            if isinstance(fobj, str):
-                fobj = open(fobj)
-            self.mmap = mmap(fobj.fileno(), 0, prot=1) # read-only for now
+    def __init__(self, fobj, offset=0, length=None):
+        self.fobj = fobj
         self._offset = offset
+        self._length = length
+
+    def __getitem__(self, key):
+        '''Return an index or slice of the object. If an integer or long
+        index, return the byte at that index. If a slice, return a
+        :class:`BinaryStructure` wrapping the associated bytes.
+        '''
+        if isinstance(key, slice):
+            if key.step:
+                raise RuntimeError('BinaryStructure does not support stepwise slices')
+            if key.start is not None and key.start < 0:
+                raise RuntimeError('BinaryStructure does not yet support negative indexing')
+            if key.stop is not None and key.stop < 0:
+                raise RuntimeError('BinaryStructure does not yet support negative indexing')
+
+            if key.start is None:
+                offset = self._offset
+            else:
+                offset = self._offset + key.start
+
+            rel_stop = key.stop
+            if rel_stop is None:
+                rel_stop = self._length
+            if self._length is not None and rel_stop > self._length:
+                rel_stop = self._length
+
+            if rel_stop is None:
+                length = None
+            else:
+                abs_stop = self._offset + rel_stop
+                length = abs_stop - offset
+                if length < 0:
+                    length = 0
+
+            return BinaryStructure(self.fobj, offset, length)
+
+        elif isinstance(key, (int, long)):
+            if self._length is None or key < self._length:
+                self.fobj.seek(self._offset + key)
+                return self.fobj.read(1)
+            else:
+                return ''
+
+        else:
+            raise RuntimeError('BinaryStructure supports only integer and slice indexing')
+
+
+    def __str__(self):
+        self.fobj.seek(self._offset)
+        return self.fobj.read(self._length)
+
+    def __len__(self):
+        if self._length is None:
+            self.fobj.seek(0, os.SEEK_END)
+            self._length = self.fobj.tell()
+        return self._length
+        
+
+def hexdump(binstruct, offset=None, stream=None):
+    '''Dump a hexadecimal representation of data from a
+    :class:`BinaryStructure` to the terminal or another stream.
+
+    :param binstruct: a :class:`BinaryStructure`
+    :param offset: the offset to begin counting structure offsets at.
+                   defaults to the file offset. ``offset=0`` will display
+                   the same binary data, but will describe the first byte as
+                   byte 0 regardless of where it is in the file.
+    :param stream: output to a stream other than ``sys.stdout``
+    '''
+    if offset is None:
+        offset = binstruct.offset
+
+    if stream is None:
+        import sys
+        stream = sys.stdout
+
+    CHUNK_SIZE = 16
+    for off in range(0, len(binstruct), CHUNK_SIZE):
+        chunk = str(binstruct[off:off+CHUNK_SIZE])
+        display_off = off + offset
+        print_s = ''.join(_printify(c) for c in chunk)
+
+        pairs = []
+        while chunk:
+            pair, chunk = chunk[:2], chunk[2:]
+            pair_s = ''.join('%02x' % (ord(c),) for c in pair)
+            pairs.append(pair_s)
+        dump_s = ' '.join(pairs)
+
+        print >>stream, '%07x: %-39s  %s' % (display_off, dump_s, print_s)
+
+def _printify(c):
+    '''Return a character for use in the printable-data summary in a
+    hexdump. Returns the character itself if it's printable, otherwise '.'.
+    '''
+    i = ord(c)
+    return c if (i >= 32 and i < 127) else '.'
 
 
 class ByteField(object):
@@ -120,7 +208,7 @@ class ByteField(object):
     When you instantiate the subclass and access the field, its value will
     be the literal bytes at that location in the structure::
 
-        >>> o = MyObject('file.bin')
+        >>> o = MyObject(open('file.bin'))
         >>> o.myfield
         'ABCD'
     """
@@ -132,8 +220,8 @@ class ByteField(object):
     def __get__(self, obj, owner):
         if obj is None:
             return self
-
-        return obj.mmap[self.start + obj._offset : self.end + obj._offset]
+        
+        return str(obj[self.start:self.end])
 
 
 class LengthPrependedStringField(object):
@@ -167,10 +255,8 @@ class LengthPrependedStringField(object):
         if obj is None:
             return self
 
-        length_offset = self.offset + obj._offset
-        length = ord(obj.mmap[length_offset])
-        data_offset = length_offset + 1
-        return obj.mmap[data_offset:data_offset + length]
+        length = ord(obj[self.offset])
+        return str(obj[self.offset+1:self.offset+1+length])
 
 
 class IntegerField(ByteField):
@@ -199,7 +285,7 @@ class IntegerField(ByteField):
     structure. So with a file whose bytes 3, 4, and 5 are
     ``'\\x00\\x01\\x04'``::
 
-        >>> o = MyObject('file.bin')
+        >>> o = MyObject(open('file.bin'))
         >>> o.myfield
         260
     """

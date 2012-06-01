@@ -76,7 +76,8 @@ class MacIndex(binfile.BinaryStructure):
         # the number of messages in this folder and the index message block size
         maxlen = self.header_length + self.total_messages * MacIndexMessage.LENGTH
         while offset < maxlen: 
-             yield MacIndexMessage(mm=self.mmap, offset=offset)
+             yield MacIndexMessage(fobj=self.fobj, offset=offset,
+                                   length=MacIndexMessage.LENGTH)
              offset += MacIndexMessage.LENGTH
 
 
@@ -120,7 +121,7 @@ class MacMail(binfile.BinaryStructure):
         :param size: size of the message,
             i.e. :attr:`MacMailMessage.size`
         '''
-        return MacMailMessage(size=size, mm=self.mmap, offset=offset)
+        return MacMailMessage(size=size, fobj=self.fobj, offset=offset)
 
 
 class MacMailMessage(binfile.BinaryStructure):
@@ -167,7 +168,7 @@ class MacMailMessage(binfile.BinaryStructure):
         '''email content for this message'''
         # return data after any initial offset, plus content offset to
         # skip header, up to the size of this message
-        return self.mmap[self.content_offset + self._offset: self._offset + self.size]
+        return str(self[self.content_offset:self.size])
 
     def as_email(self):
         '''Return message data as a :class:`email.message.Message`
@@ -192,13 +193,13 @@ class MacFolder(object):
         index_filename = os.path.join(folder_path, 'Index')
         data_filename = os.path.join(folder_path, 'Mail')
         if os.path.exists(index_filename):
-            self.index = MacIndex(index_filename)
+            self.index = MacIndex(open(index_filename))
         else:
             raise RuntimeError('Outlook Express Folder Index does not exist at "%s"' % \
                             index_filename)
         # data file will not be present for empty folders
         if os.path.exists(data_filename):
-            self.data = MacMail(data_filename)
+            self.data = MacMail(open(data_filename))
 
     @property
     def count(self):
