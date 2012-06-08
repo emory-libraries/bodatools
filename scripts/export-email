@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+
+# file scripts/export-email
+# 
+#   Copyright 2012 Emory University Libraries
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+import argparse
+import email
+import glob
+import os
+
+from bodatools import __version__ as bodatools_version
+from bodatools.binfile import outlookexpress
+
+
+def main():
+    desc = '''Export email messages from binary folder format into individual
+files for each email or attachment.
+Currently only supports Outlook Express 4.5 for Macintosh.
+
+For more details on usage and output formats, see
+http://bodatools.readthedocs.org/en/latest/scripts.html
+'''
+    
+    parser = argparse.ArgumentParser(description=desc,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(dest='dir', metavar='INPUT_DIR', nargs=1,
+                        help='Directory that contains email folders to be exported')
+    parser.add_argument(dest='output', metavar='OUTPUT_DIR', nargs=1,
+                        help='Output directory for exported content')
+    parser.add_argument('--version', action='version',
+                        version='%%(prog)s bodatools %s' % \
+                        bodatools_version)
+    args = parser.parse_args()
+    
+    input_dir = args.dir[0]
+    output_dir = args.output[0]
+
+    # make sure directories exist before proceeding
+    if not os.path.isdir(input_dir):
+        print 'Error: %s is not a directory' % input_dir
+        exit(-1)
+    if not os.path.isdir(output_dir):
+        # error? or create if it doesn't exist?
+        print 'Error: %s is not a directory' % output_dir
+        exit(-1)
+
+    # look for all directories immediately under the specified path
+    # with an 'Index' file
+    folder_indexes = glob.glob(os.path.join(input_dir, '*', 'Index'))
+    folder_paths = [os.path.dirname(f) for f in folder_indexes]
+
+    for f_path in folder_paths:
+        folder = outlookexpress.MacFolder(f_path)
+        # TODO: exception/error wrapper ?
+
+        # generate a folder name based on directory, to label output
+        folder_name = os.path.basename(f_path.rstrip('/'))
+
+        print 'Mail folder "%s" contains %d message(s)' % (folder_name, folder.count)
+        if folder.count:
+            process_folder(folder, folder_name, output_dir)
+
+    exit(0)
+
+
+def process_folder(folder, folder_name, output_dir):
+    stats = {'messages': 0, 'attachments': 0, 'deleted': 0}
+    
+    # loop through messages in the folder and output as individual files
+    for raw_msg in folder.raw_messages:
+        if raw_msg.deleted:
+            stats['deleted'] += 1
+            continue
+
+        msg = raw_msg.as_email()
+        
+        output_name = '%s %s' % (folder_name, msg['Date'])
+        # TODO: sanitize unicode characters, e.g. sabine muller in sent mail
+        if folder_name == 'Sent Mail':
+            output_name += ' To %s%s ' % (msg['To'][:25],
+                                         '...' if len(msg['To']) > 25 else '')
+        else:
+            output_name += ' From %s ' % msg['From']
+        output_name += msg.get('Subject', '')
+        # sanitize for use as filename (FIXME: better way to do this?)
+        output_name = output_name.replace('/', '-')
+        # write out the full, original email, with any embedded attachments
+        with open(os.path.join(output_dir, output_name), 'w') as output:
+            output.write(msg.as_string())
+            stats['messages'] += 1
+            
+        # check for attachments
+        if msg.is_multipart():
+            # define a parts directory based on output file name,
+            # in case message has attachments
+            parts_dir = os.path.join(output_dir, '%s_parts' % output_name)
+
+            payload = msg.get_payload()
+            # NOTE: sub parts could themselves be multipart...
+            for p in payload:
+                # NOTE: only handling attachments for now
+                
+                # Content disposition is not present for all,
+                # so include anything that email can generate a filename for
+                if 'attachment' in p.get('Content-Disposition', '') \
+                       or p.get_filename():
+
+                    # In earlier versions of Python (at least 2.6.1),
+                    # an attachment filename cannot be determined in
+                    # some cases where 2.7.x Python returns finds one.
+                    # Warn and skip
+                    if not p.get_filename():
+                        print 'Error, could not determine filename for attachment'
+                        continue
+                    
+                    # make a parts dir if we don't have one yet
+                    if not os.path.isdir(parts_dir):
+                        os.mkdir(parts_dir)
+                        
+                    # decode the attachment content and output as a file in the parts dir
+                    # use the original attachment filename for output
+                    with open(os.path.join(parts_dir, p.get_filename()), 'w') as part:
+                        part.write(p.get_payload(decode=True))
+                        stats['attachments'] += 1
+
+            # For now, assuming any other multi-part content is inline
+            # and already visible in the original text email.
+
+    print "  Saved %(messages)d email message(s) and %(attachments)d attachment file(s)" % \
+          stats
+    if stats['deleted']:
+        print "  Skipped %(deleted)d deleted messages" % stats
+    if folder.skipped_chunks:
+        print "  Mail file includes %d sections not referenced by Index file" % \
+              folder.skipped_chunks
+
+
+
+if __name__ == '__main__':
+    main()
